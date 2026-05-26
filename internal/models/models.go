@@ -14,7 +14,6 @@ type Movie struct {
 	Year        int                `bson:"year"             json:"year"`
 	Rating      float64            `bson:"rating"           json:"rating"`
 	PosterURL   string             `bson:"poster_url"       json:"poster_url"`
-	// 1536-dim vector
 	Embedding   []float32          `bson:"embedding"        json:"-"`
 	SearchText string              `bson:"search_text,omitempty" json:"-"`
 	CreatedAt   time.Time          `bson:"created_at"       json:"created_at"`
@@ -46,6 +45,7 @@ type UserEvent struct {
 	UserID    string             `bson:"user_id"       json:"user_id"`
 	MovieID   *primitive.ObjectID `bson:"movie_id,omitempty"      json:"movie_id,omitempty"`
 	Type      EventType          `bson:"type"          json:"type"`
+	Score    float64            `bson:"score"         json:"score"`
 	RatingValue *float64         `bson:"rating_value,omitempty"`
     WatchSeconds    int          `bson:"watch_seconds,omitempty"`
 	DurationSeconds int          `bson:"duration_seconds,omitempty"`
