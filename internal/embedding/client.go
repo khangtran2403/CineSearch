@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -105,7 +106,8 @@ func (c *GeminiClient) Embed(ctx context.Context, text string, taskType string) 
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("gemini API returned status %d", resp.StatusCode)
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("gemini API returned status %d: %s", resp.StatusCode, string(body))
 	}
 
 	var result geminiResponse
@@ -164,6 +166,10 @@ func (c *GeminiClient) EmbedBatch(ctx context.Context, texts []string, taskType 
 		return nil, fmt.Errorf("gemini batch request: %w", err)
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("gemini batch API returned status %d: %s", resp.StatusCode, string(body))
+	}
 
 	var result geminiBatchResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
@@ -180,8 +186,8 @@ func (c *GeminiClient) EmbedBatch(ctx context.Context, texts []string, taskType 
 // ─── Helper functions ─────────────────────────────────────────────────────────
 
 // EmbedMovie — embed một bộ phim với RETRIEVAL_DOCUMENT task type.
-func (c *GeminiClient) EmbedMovie(ctx context.Context, title string, genres []string, overview string) ([]float32, error) {
-	text := MovieText(title, genres, overview)
+func (c *GeminiClient) EmbedMovie(ctx context.Context, title string, genres []string, overview string, keywords []string) ([]float32, error) {
+	text := MovieText(title, genres, overview, keywords)
 	return c.Embed(ctx, text, "RETRIEVAL_DOCUMENT")
 }
 
@@ -190,9 +196,25 @@ func (c *GeminiClient) EmbedQuery(ctx context.Context, text string) ([]float32, 
 	return c.Embed(ctx, text, "RETRIEVAL_QUERY")
 }
 
-// MovieText — tạo text để embed, giữ nguyên từ client.go gốc
-func MovieText(title string, genres []string, overview string) string {
-	 return fmt.Sprintf("Title: %s\nGenres: %s\nPlot: %s", title, strings.Join(genres, ", "), overview)
+// MovieText — tạo rich text để embed, kết hợp title + genres + overview + keywords
+func MovieText(title string, genres []string, overview string, keywords []string) string {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("Title: %s\n", title))
+	if len(genres) > 0 {
+		sb.WriteString(fmt.Sprintf("Genres: %s\n", strings.Join(genres, ", ")))
+	}
+	if overview != "" {
+		sb.WriteString(fmt.Sprintf("Plot: %s\n", overview))
+	}
+	if len(keywords) > 0 {
+		// Chỉ lấy 10 keywords đầu để tránh noise
+		kw := keywords
+		if len(kw) > 10 {
+			kw = kw[:10]
+		}
+		sb.WriteString(fmt.Sprintf("Keywords: %s\n", strings.Join(kw, ", ")))
+	}
+	return sb.String()
 }
 
 // UpdateTasteVec — weighted moving average của taste vector.
